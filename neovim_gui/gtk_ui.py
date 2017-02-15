@@ -21,6 +21,27 @@ CTRL = Gdk.ModifierType.CONTROL_MASK
 ALT = Gdk.ModifierType.MOD1_MASK
 
 
+def prevent_duplicate_events(func):
+    events = {}
+
+    def decorated(self, widget, event, *args, **kwargs):
+        event_id = (event.time, id(event), event.type)
+
+        if event_id in events:
+            del events[event_id]
+            return
+
+        # remove all other events to save mem
+        events.clear()
+
+        # track last event
+        events[event_id] = True
+
+        return func(self, widget, event, *args, **kwargs)
+
+    return decorated
+
+
 # Translation table for the names returned by Gdk.keyval_name that don't match
 # the corresponding nvim key names.
 KEY_TABLE = {
@@ -367,6 +388,7 @@ class GtkUI(object):
     def _gtk_key_release(self, widget, event, *args):
         self._im_context.filter_keypress(event)
 
+    @prevent_duplicate_events
     def _gtk_button_press(self, widget, event, *args):
         if not self._mouse_enabled or event.type != Gdk.EventType.BUTTON_PRESS:
             return
@@ -382,6 +404,7 @@ class GtkUI(object):
         self._bridge.input(input_str)
         self._pressed = button
 
+    @prevent_duplicate_events
     def _gtk_button_release(self, widget, event, *args):
         self._pressed = None
 
